@@ -69,15 +69,27 @@ def plot_results(models,
 
     encoder, decoder = models
     x_test, y_test = data
+    xmin = ymin = -4
+    xmax = ymax = +4
     os.makedirs(model_name, exist_ok=True)
 
     filename = os.path.join(model_name, "vae_mean.png")
     # display a 2D plot of the digit classes in the latent space
-    z_mean, _, _ = encoder.predict(x_test,
-                                   batch_size=batch_size)
+    z, _, _ = encoder.predict(x_test,
+                              batch_size=batch_size)
     plt.figure(figsize=(12, 10))
-    plt.scatter(z_mean[:, 0], z_mean[:, 1], c=y_test)
-    plt.colorbar()
+
+    # axes x and y ranges
+    axes = plt.gca()
+    axes.set_xlim([xmin,xmax])
+    axes.set_ylim([ymin,ymax])
+
+    # subsample to reduce density of points on the plot
+    z = z[0::2]
+    y_test = y_test[0::2]
+    plt.scatter(z[:, 0], z[:, 1], marker="")
+    for i, digit in enumerate(y_test):
+        axes.annotate(digit, (z[i, 0], z[i, 1]))
     plt.xlabel("z[0]")
     plt.ylabel("z[1]")
     plt.savefig(filename)
@@ -174,20 +186,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     help_ = "Load tf model trained weights"
     parser.add_argument("-w", "--weights", help=help_)
-    help_ = "Use mse loss instead of binary cross entropy (default)"
-    parser.add_argument("-m",
-                        "--mse",
-                        help=help_, action='store_true')
+    help_ = "Use binary cross entropy instead of mse (default)"
+    parser.add_argument("--bce", help=help_, action='store_true')
     args = parser.parse_args()
     models = (encoder, decoder)
     data = (x_test, y_test)
 
     # VAE loss = mse_loss or xent_loss + kl_loss
-    if args.mse:
-        reconstruction_loss = mse(inputs, outputs)
-    else:
+    if args.bce:
         reconstruction_loss = binary_crossentropy(inputs,
                                                   outputs)
+    else:
+        reconstruction_loss = mse(inputs, outputs)
 
     reconstruction_loss *= original_dim
     kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
